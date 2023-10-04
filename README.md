@@ -1,66 +1,54 @@
-## Foundry
+createListing
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+- set order creator to msg.sender
+- token address
+- tokenId
+- price
+- sign
+- deadline
+- listing status
 
-Foundry consists of:
+preconditions
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- owner
+  - check that owner is really the owner of tokenId --> ownerOf()
+  - check that owner has approved address(this) to spend tokenAddress -->isApprovedForAll()
+- token address
 
-## Documentation
+  - check if token address is not address(0)
+  - check if the address has code
 
-https://book.getfoundry.sh/
+- price
+  - check that price > 0
+- sign
+-
+- deadline
+  - must be > block.timestamp
+- listing status
 
-## Usage
+logic
 
-### Build
+- store data in storage
+- increment id for Listings
+- emit event
+- listing status is set to active
 
-```shell
-$ forge build
-```
+executeListing(payable)
 
-### Test
+- listingId
 
-```shell
-$ forge test
-```
+preconditions
 
-### Format
+- check that listingId< public counter
+- check that msg.value == listing.price
+- check that block.timestamp <= listing.deadline
+- check that signature is signed by listing.owner
+- check that status is active
 
-```shell
-$ forge fmt
-```
+logic
 
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- retrieve data from storage
+- transfer ether from buyer to seller
+- transfer nft from seller to buyer
+- emit event
+- set status to inactive

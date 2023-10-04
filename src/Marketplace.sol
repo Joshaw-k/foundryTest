@@ -25,8 +25,8 @@ contract Marketplace {
 
     Counters.Counter private listingIdCounter;
 
-    modifier onlyTokenOwner(uint256 listingId) {
-        require(msg.sender == _listings[listingId].tokenOwner, "Not the token owner");
+    modifier onlyseller(uint256 listingId) {
+        require(msg.sender == _listings[listingId].seller, "Not the token owner");
         _;
     }
 
@@ -40,12 +40,12 @@ contract Marketplace {
         _;
     }
 
-    event OrderCreated(uint256 orderId, address tokenOwner, address tokenAddress, uint256 tokenId, uint256 price, uint256 deadline);
+    event OrderCreated(uint256 orderId, address seller, address token, uint256 tokenId, uint256 price, uint256 deadline);
     event OrderCancelled(uint256 orderId);
     event OrderFulfilled(uint256 orderId, address buyer);
 
     function createListing(
-        address _tokenAddress,
+        address _token,
         uint256 _tokenId,
         uint256 _price,
         uint256 _deadline,
@@ -54,12 +54,12 @@ contract Marketplace {
         require(_price > 0, "Price must be greater than zero");
         require(_deadline > block.timestamp, "Deadline must be in the future");
 
-        bytes32 orderHash = keccak256(abi.encodePacked(_tokenAddress, _tokenId, _price, msg.sender, _deadline));
+        bytes32 orderHash = keccak256(abi.encodePacked(_token, _tokenId, _price, msg.sender, _deadline));
         require(orderHash.recover(_signature) == msg.sender, "Invalid signature");
 
-        _listings[orderIdCounter.current()] = Listing({
-            tokenOwner: msg.sender,
-            tokenAddress: _tokenAddress,
+        _listings[listingIdCounter.current()] = Listing({
+            seller: msg.sender,
+            token: _token,
             tokenId: _tokenId,
             price: _price,
             status: ListingStatus.Active,
@@ -68,18 +68,18 @@ contract Marketplace {
         });
 
         emit OrderCreated(
-            orderIdCounter.current(),
+            listingIdCounter.current(),
             msg.sender,
-            _tokenAddress,
+            _token,
             _tokenId,
             _price,
             _deadline
         );
 
-        orderIdCounter.increment();
+        listingIdCounter.increment();
     }
 
-    function cancelListing(uint256 listingId) external onlyTokenOwner(listingId) onlyActiveOrder(listingId) {
+    function cancelListing(uint256 listingId) external onlyseller(listingId) onlyActiveOrder(listingId) {
         _listings[listingId].status = ListingStatus.Inactive;
         emit OrderCancelled(listingId);
     }
@@ -87,11 +87,9 @@ contract Marketplace {
     function fulfillListing(uint256 listingId) external payable onlyActiveOrder(listingId) onlyBeforeDeadline(listingId) {
         require(msg.value == _listings[listingId].price, "Incorrect payment amount");
 
-        // Transfer the token to the buyer
-        IERC721(_listings[listingId].tokenAddress).transferFrom(_listings[listingId].tokenOwner, msg.sender, _listings[listingId].tokenId);
+        IERC721(_listings[listingId].token).transferFrom(_listings[listingId].seller, msg.sender, _listings[listingId].tokenId);
 
-        // Transfer the payment to the seller
-        payable(_listings[listingId].tokenOwner).transfer(msg.value);
+        payable(_listings[listingId].seller).transfer(msg.value);
 
         // Mark the order as fulfilled
         _listings[listingId].status = ListingStatus.Inactive;
