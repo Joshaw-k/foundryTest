@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import "openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import "openzeppelin-contracts/contracts/utils/Counters.sol";
+import {SignUtils} from "./libraries/SignUtils.sol";
 
 contract Marketplace {
     using ECDSA for bytes32;
@@ -25,18 +26,14 @@ contract Marketplace {
 
     Counters.Counter private listingIdCounter;
 
+    address public admin;
+
+    constructor() {
+        admin = msg.sender;
+    }
+
     modifier onlyseller(uint256 listingId) {
         require(msg.sender == _listings[listingId].seller, "Not the token owner");
-        _;
-    }
-
-    modifier onlyActiveOrder(uint256 listingId) {
-        require(_listings[listingId].status == ListingStatus.Active, "Order is not active");
-        _;
-    }
-
-    modifier onlyBeforeDeadline(uint256 listingId) {
-        require(block.timestamp <= _listings[listingId].deadline, "Order has expired");
         _;
     }
 
@@ -55,7 +52,14 @@ contract Marketplace {
         require(_deadline > block.timestamp, "Deadline must be in the future");
 
         bytes32 orderHash = keccak256(abi.encodePacked(_token, _tokenId, _price, msg.sender, _deadline));
-        require(orderHash.recover(_signature) == msg.sender, "Invalid signature");
+        bytes32 ethSignedOrderHash = orderHash.toEthSignedMessageHash();
+        require(ethSignedOrderHash.recover(_signature) == msg.sender, "Invalid signature");
+
+        IERC721 nft = IERC721(_token);
+
+        require(nft.ownerOf(_tokenId) == msg.sender, "You do not own this nft");
+
+        require(nft.isApprovedForAll(msg.sender, address(this)), "Permission not granted to spent this token");
 
         _listings[listingIdCounter.current()] = Listing({
             seller: msg.sender,
@@ -79,21 +83,25 @@ contract Marketplace {
         listingIdCounter.increment();
     }
 
-    function cancelListing(uint256 listingId) external onlyseller(listingId) onlyActiveOrder(listingId) {
+    function cancelListing(uint256 listingId) external onlyseller(listingId) {
         _listings[listingId].status = ListingStatus.Inactive;
         emit OrderCancelled(listingId);
     }
 
-    function fulfillListing(uint256 listingId) external payable onlyActiveOrder(listingId) onlyBeforeDeadline(listingId) {
+    function fulfillListing(uint256 listingId) external payable {
+        require(_listings[listingId].deadline > block.timestamp,"Listing Expired");
+        require(_listings[listingId].status == ListingStatus.Active,"Listing not active");
         require(msg.value == _listings[listingId].price, "Incorrect payment amount");
+         _listings[listingId].status = ListingStatus.Inactive;
 
         IERC721(_listings[listingId].token).transferFrom(_listings[listingId].seller, msg.sender, _listings[listingId].tokenId);
 
         payable(_listings[listingId].seller).transfer(msg.value);
 
-        // Mark the order as fulfilled
-        _listings[listingId].status = ListingStatus.Inactive;
-
         emit OrderFulfilled(listingId, msg.sender);
+    }
+
+    function getListing(uint256 listingId) external view returns (Listing memory _listing) {
+        _listing = _listings[listingId];
     }
 }
