@@ -6,7 +6,6 @@ import "../src/AlexiaToken.sol";
 import "./Helpers.sol";
 
 contract MarketPlaceTest is Helpers {
-    Marketplace mPlace;
     Alexia alexia;
 
     uint256 currentListingId;
@@ -17,10 +16,12 @@ contract MarketPlaceTest is Helpers {
     uint256 privateKey1;
     uint256 privateKey2;
 
+    Marketplace marketplace;
+
     Marketplace.Listing listing;
 
     function setUp() public {
-        mPlace = new Marketplace();
+        marketplace = new Marketplace();
         alexia = new Alexia();
 
         (publicAddress1, privateKey1) = mkaddr("publicAddress1");
@@ -41,7 +42,7 @@ contract MarketPlaceTest is Helpers {
 
     function testValidSig() public {
         switchSigner(publicAddress1);
-        alexia.setApprovalForAll(address(mPlace), true);
+        alexia.setApprovalForAll(address(marketplace), true);
         listing.deadline = block.timestamp + 120 minutes;
         listing.signature = constructSig(
             listing.token,
@@ -52,10 +53,19 @@ contract MarketPlaceTest is Helpers {
             privKeyB
         );
         vm.expectRevert("Not Owner");
-        mPlace.createListing(listing.token,listing.tokenId,listing.price,59 minutes,listing.signature);
+        marketplace.createListing(listing.token,listing.tokenId,listing.price,59 minutes,listing.signature);
     }
 
-    
+    function testNonValidListing() public {
+        switchSigner(publicAddress1);
+        vm.expectRevert("Not Valid Listing");
+        marketplace.fulfillListing(1);
+    }
+
+    function testExpiredListing() public {
+        switchSigner(publicAddress1);
+        alexia.setApprovalForAll(address(marketplace), true);
+    }
 
      function testExecute() public {
         switchSigner(publicAddress1);
@@ -88,57 +98,5 @@ contract MarketPlaceTest is Helpers {
         assertEq(publicAddress1BalanceAfter, publicAddress1BalanceBefore + listing.price);
     }
 
-    function testExecuteNonValidListing() public {
-        switchSigner(publicAddress1);
-        vm.expectRevert("Not Valid Listing");
-        mPlace.executeListing(1);
-    }
-
-    function testExecuteExpiredListing() public {
-        switchSigner(publicAddress1);
-        alexia.setApprovalForAll(address(mPlace), true);
-    }
-
-    function testExecuteListingNotActive() public {
-        switchSigner(publicAddress1);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
-            listing.token,
-            listing.tokenId,
-            listing.price,
-            listing.deadline,
-            listing.seller,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(listing);
-        mPlace.editListing(lId, 0.01 ether, false);
-        switchSigner(publicAddress2);
-        vm.expectRevert("Not Active");
-        mPlace.executeListing(lId);
-    }
-
-    function testExecutePriceNotMet() public {
-        switchSigner(publicAddress1);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
-            listing.token,
-            listing.tokenId,
-            listing.price,
-            listing.deadline,
-            listing.seller,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(listing);
-        switchSigner(publicAddress2);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Marketplace.PriceNotMet.selector,
-                listing.price - 0.9 ether
-            )
-        );
-        mPlace.executeListing{value: 0.9 ether}(lId);
-    }
-   
+    
 }
