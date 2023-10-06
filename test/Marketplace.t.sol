@@ -1,46 +1,247 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console2} from "forge-std/Test.sol";
 import {Marketplace} from "../src/Marketplace.sol";
-import "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
+import "../src/AlexiaToken.sol";
+import "./Helpers.sol";
 
-contract MarketplaceTest is Test {
-    Marketplace public marketplace;
-    uint privateKey;
-    function constructSig(
-        address _tokenAddress,
-        uint256 _tokenId,
-        uint256 _price,
-        uint256 _deadline,
-        uint256 privKey
-    ) public pure returns (bytes memory sig) {
-        bytes32 mHash = keccak256(abi.encodePacked(_tokenAddress, _tokenId, _price, _deadline));
+contract MarketPlaceTest is Helpers {
+    Marketplace mPlace;
+    Alexia alexia;
 
-        mHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", mHash));
+    uint256 currentListingId;
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey, mHash);
-        sig = getSig(v, r, s);
-    }
+    address userA;
+    address userB;
 
-    function getSig(
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) public pure returns (bytes memory sig) {
-        sig = bytes.concat(r, s, bytes1(v));
-    }
+    uint256 privKeyA;
+    uint256 privKeyB;
+
+    Marketplace.Listing listing;
 
     function setUp() public {
-        marketplace = new Marketplace();
-        vm.prank(0xB5119738BB5Fe8BE39aB592539EaA66F03A77174);
-        IERC721(0xD20e11e46b923a4dDE6BB44dE1913e1497Bd0E98).approve(address(marketplace), 2);
+        mPlace = new Marketplace();
+        alexia = new Alexia();
+
+        (userA, privKeyA) = mkaddr("USERA");
+        (userB, privKeyB) = mkaddr("USERB");
+
+        listing = Marketplace.Listing({
+            token: address(alexia),
+            tokenId: 1,
+            price: 1 ether,
+            signature: bytes(""),
+            deadline: 0,
+            seller: address(0),
+            status: listing.status
+        });
+
+        alexia.mint(userA, 1);
     }
 
-    function test_CreateOrder() public {
-        vm.startPrank(0x9d4eF81F5225107049ba08F69F598D97B31ea644);
-        bytes memory _signature = constructSig(address(0xD20e11e46b923a4dDE6BB44dE1913e1497Bd0E98), 2, 0.0001 ether, block.timestamp + 1 hours, 0x9534d190ad6db1009e5bbbd5847befdeb837bf2c4d1b4ce4f0e708bf2f98da4a);
-        marketplace.createListing(address(0xD20e11e46b923a4dDE6BB44dE1913e1497Bd0E98), 2, 0.0001 ether, block.timestamp + 1 hours, _signature);
-        vm.stopPrank();
+    function testOwnerCannotCreateListing() public {
+        listing.seller = userB;
+        switchSigner(userB);
+
+        vm.expectRevert(Marketplace.NotOwner.selector);
+        mPlace.createListing(listing);
+    }
+
+    function testNonApprovedNFT() public {
+        switchSigner(userA);
+        vm.expectRevert(Marketplace.NotApproved.selector);
+        mPlace.createListing(listing);
+    }
+
+    function testMinPriceTooLow() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.price = 0;
+        vm.expectRevert(Marketplace.MinPriceTooLow.selector);
+        mPlace.createListing(listing);
+    }
+
+    function testMinDeadline() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        vm.expectRevert(Marketplace.DeadlineTooSoon.selector);
+        mPlace.createListing(listing);
+    }
+
+    function testMinDuration() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 59 minutes);
+        vm.expectRevert(Marketplace.MinDurationNotMet.selector);
+        mPlace.createListing(listing);
+    }
+
+    function testValidSig() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyB
+        );
+        vm.expectRevert(Marketplace.InvalidSignature.selector);
+        mPlace.createListing(listing);
+    }
+
+    // EDIT LISTING
+    function testEditNonValidListing() public {
+        switchSigner(userA);
+        vm.expectRevert(Marketplace.ListingNotExistent.selector);
+        mPlace.editListing(1, 0, false);
+    }
+
+    function testEditListingNotOwner() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        // vm.expectRevert(Marketplace.ListingNotExistent.selector);
+        uint256 lId = mPlace.createListing(listing);
+
+        switchSigner(userB);
+        vm.expectRevert(Marketplace.NotOwner.selector);
+        mPlace.editListing(lId, 0, false);
+    }
+
+    function testEditListing() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        uint256 lId = mPlace.createListing(listing);
+        mPlace.editListing(lId, 0.01 ether, false);
+
+        Marketplace.Listing memory t = mPlace.getListing(lId);
+        assertEq(t.price, 0.01 ether);
+        assertEq(t.active, false);
+    }
+
+    // EXECUTE LISTING
+    function testExecuteNonValidListing() public {
+        switchSigner(userA);
+        vm.expectRevert(Marketplace.ListingNotExistent.selector);
+        mPlace.executeListing(1);
+    }
+
+    function testExecuteExpiredListing() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+    }
+
+    function testExecuteListingNotActive() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        uint256 lId = mPlace.createListing(listing);
+        mPlace.editListing(lId, 0.01 ether, false);
+        switchSigner(userB);
+        vm.expectRevert(Marketplace.ListingNotActive.selector);
+        mPlace.executeListing(lId);
+    }
+
+    function testExecutePriceNotMet() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        uint256 lId = mPlace.createListing(listing);
+        switchSigner(userB);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.PriceNotMet.selector,
+                listing.price - 0.9 ether
+            )
+        );
+        mPlace.executeListing{value: 0.9 ether}(lId);
+    }
+
+    function testExecutePriceMismatch() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        uint256 lId = mPlace.createListing(listing);
+        switchSigner(userB);
+        vm.expectRevert(
+            abi.encodeWithSelector(Marketplace.PriceMismatch.selector, listing.price)
+        );
+        mPlace.executeListing{value: 1.1 ether}(lId);
+    }
+
+    function testExecute() public {
+        switchSigner(userA);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        // listing.price = 1 ether;
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        uint256 lId = mPlace.createListing(listing);
+        switchSigner(userB);
+        uint256 userABalanceBefore = userA.balance;
+
+        mPlace.executeListing{value: listing.price}(lId);
+
+        uint256 userABalanceAfter = userA.balance;
+
+        Marketplace.Listing memory t = mPlace.getListing(lId);
+        assertEq(t.price, 1 ether);
+        assertEq(t.active, false);
+
+        assertEq(t.active, false);
+        assertEq(ERC721(listing.token).ownerOf(listing.tokenId), userB);
+        assertEq(userABalanceAfter, userABalanceBefore + listing.price);
     }
 }
+
+import "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
