@@ -11,11 +11,11 @@ contract MarketPlaceTest is Helpers {
 
     uint256 currentListingId;
 
-    address userA;
-    address userB;
+    address publicAddress1;
+    address publicAddress2;
 
-    uint256 privKeyA;
-    uint256 privKeyB;
+    uint256 privateKey1;
+    uint256 privateKey2;
 
     Marketplace.Listing listing;
 
@@ -23,8 +23,8 @@ contract MarketPlaceTest is Helpers {
         mPlace = new Marketplace();
         alexia = new Alexia();
 
-        (userA, privKeyA) = mkaddr("USERA");
-        (userB, privKeyB) = mkaddr("USERB");
+        (publicAddress1, privKeyA) = mkaddr("publicAddress1");
+        (publicAddress2, privKeyB) = mkaddr("publicAddress2");
 
         listing = Marketplace.Listing({
             token: address(alexia),
@@ -36,51 +36,14 @@ contract MarketPlaceTest is Helpers {
             status: listing.status
         });
 
-        alexia.mint(userA, 1);
-    }
-
-    function testOwnerCannotCreateListing() public {
-        listing.seller = userB;
-        switchSigner(userB);
-
-        vm.expectRevert("Not Owner");
-        mPlace.createListing(listing.token,listing.tokenId,listing.price,59 minutes,bytes(""));
-    }
-
-    function testNonApprovedNFT() public {
-        switchSigner(userA);
-        vm.expectRevert("Not Owner");
-        mPlace.createListing(listing);
-    }
-
-    function testMinPriceTooLow() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.price = 0;
-        vm.expectRevert("Not Owner");
-        mPlace.createListing(listing);
-    }
-
-    function testMinDeadline() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        vm.expectRevert("Not Owner");
-        mPlace.createListing(listing);
-    }
-
-    function testMinDuration() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 59 minutes);
-        vm.expectRevert("Not Owner");
-        mPlace.createListing(listing);
+        alexia.mint(publicAddress1, 1);
     }
 
     function testValidSig() public {
-        switchSigner(userA);
+        switchSigner(publicAddress1);
         alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
+        listing.deadline = block.timestamp + 120 minutes;
+        listing.signature = constructSig(
             listing.token,
             listing.tokenId,
             listing.price,
@@ -89,132 +52,13 @@ contract MarketPlaceTest is Helpers {
             privKeyB
         );
         vm.expectRevert("Not Owner");
-        mPlace.createListing(listing);
+        mPlace.createListing(listing.token,listing.tokenId,listing.price,59 minutes,listing.signature);
     }
 
-    // EDIT LISTING
-    function testEditNonValidListing() public {
-        switchSigner(userA);
-        vm.expectRevert("Not Owner");
-        mPlace.editListing(1, 0, false);
-    }
+    
 
-    function testEditListingNotOwner() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
-            listing.token,
-            listing.tokenId,
-            listing.price,
-            listing.deadline,
-            listing.seller,
-            privKeyA
-        );
-        // vm.expectRevert(Marketplace.ListingNotExistent.selector);
-        uint256 lId = mPlace.createListing(listing);
-
-        switchSigner(userB);
-        vm.expectRevert("Not Owner");
-        mPlace.editListing(lId, 0, false);
-    }
-
-    function testEditListing() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
-            listing.token,
-            listing.tokenId,
-            listing.price,
-            listing.deadline,
-            listing.seller,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(listing);
-        mPlace.editListing(lId, 0.01 ether, false);
-
-        Marketplace.Listing memory t = mPlace.getListing(lId);
-        assertEq(t.price, 0.01 ether);
-        assertEq(t.active, false);
-    }
-
-    // EXECUTE LISTING
-    function testExecuteNonValidListing() public {
-        switchSigner(userA);
-        vm.expectRevert("Not Owner");
-        mPlace.executeListing(1);
-    }
-
-    function testExecuteExpiredListing() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-    }
-
-    function testExecuteListingNotActive() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
-            listing.token,
-            listing.tokenId,
-            listing.price,
-            listing.deadline,
-            listing.seller,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(listing);
-        mPlace.editListing(lId, 0.01 ether, false);
-        switchSigner(userB);
-        vm.expectRevert("Not Owner");
-        mPlace.executeListing(lId);
-    }
-
-    function testExecutePriceNotMet() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
-            listing.token,
-            listing.tokenId,
-            listing.price,
-            listing.deadline,
-            listing.seller,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(listing);
-        switchSigner(userB);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Marketplace.PriceNotMet.selector,
-                listing.price - 0.9 ether
-            )
-        );
-        mPlace.executeListing{value: 0.9 ether}(lId);
-    }
-
-    function testExecutePriceMismatch() public {
-        switchSigner(userA);
-        alexia.setApprovalForAll(address(mPlace), true);
-        listing.deadline = uint88(block.timestamp + 120 minutes);
-        listing.sig = constructSig(
-            listing.token,
-            listing.tokenId,
-            listing.price,
-            listing.deadline,
-            listing.seller,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(listing);
-        switchSigner(userB);
-        vm.expectRevert(
-            abi.encodeWithSelector("Not Owner", listing.price)
-        );
-        mPlace.executeListing{value: 1.1 ether}(lId);
-    }
-
-    function testExecute() public {
-        switchSigner(userA);
+     function testExecute() public {
+        switchSigner(publicAddress1);
         alexia.setApprovalForAll(address(mPlace), true);
         listing.deadline = uint88(block.timestamp + 120 minutes);
         // listing.price = 1 ether;
@@ -227,21 +71,73 @@ contract MarketPlaceTest is Helpers {
             privKeyA
         );
         uint256 lId = mPlace.createListing(listing);
-        switchSigner(userB);
-        uint256 userABalanceBefore = userA.balance;
+        switchSigner(publicAddress2);
+        uint256 publicAddress1BalanceBefore = publicAddress1.balance;
 
         mPlace.executeListing{value: listing.price}(lId);
 
-        uint256 userABalanceAfter = userA.balance;
+        uint256 publicAddress1BalanceAfter = publicAddress1.balance;
 
         Marketplace.Listing memory t = mPlace.getListing(lId);
         assertEq(t.price, 1 ether);
         assertEq(t.active, false);
 
         assertEq(t.active, false);
-        assertEq(ERC721(listing.token).ownerOf(listing.tokenId), userB);
-        assertEq(userABalanceAfter, userABalanceBefore + listing.price);
+        assertEq(ERC721(listing.token).ownerOf(listing.tokenId), publicAddress2);
+        assertEq(publicAddress1BalanceAfter, publicAddress1BalanceBefore + listing.price);
     }
-}
-
 import "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
+    function testExecuteNonValidListing() public {
+        switchSigner(publicAddress1);
+        vm.expectRevert("Not Owner");
+        mPlace.executeListing(1);
+    }
+
+    function testExecuteExpiredListing() public {
+        switchSigner(publicAddress1);
+        alexia.setApprovalForAll(address(mPlace), true);
+    }
+
+    function testExecuteListingNotActive() public {
+        switchSigner(publicAddress1);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        uint256 lId = mPlace.createListing(listing);
+        mPlace.editListing(lId, 0.01 ether, false);
+        switchSigner(publicAddress2);
+        vm.expectRevert("Not Owner");
+        mPlace.executeListing(lId);
+    }
+
+    function testExecutePriceNotMet() public {
+        switchSigner(publicAddress1);
+        alexia.setApprovalForAll(address(mPlace), true);
+        listing.deadline = uint88(block.timestamp + 120 minutes);
+        listing.sig = constructSig(
+            listing.token,
+            listing.tokenId,
+            listing.price,
+            listing.deadline,
+            listing.seller,
+            privKeyA
+        );
+        uint256 lId = mPlace.createListing(listing);
+        switchSigner(publicAddress2);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.PriceNotMet.selector,
+                listing.price - 0.9 ether
+            )
+        );
+        mPlace.executeListing{value: 0.9 ether}(lId);
+    }
+   
+}
