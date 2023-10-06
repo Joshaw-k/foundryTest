@@ -23,8 +23,8 @@ contract MarketPlaceTest is Helpers {
         mPlace = new Marketplace();
         alexia = new Alexia();
 
-        (publicAddress1, privKeyA) = mkaddr("publicAddress1");
-        (publicAddress2, privKeyB) = mkaddr("publicAddress2");
+        (publicAddress1, privateKey1) = mkaddr("publicAddress1");
+        (publicAddress2, privateKey2) = mkaddr("publicAddress2");
 
         listing = Marketplace.Listing({
             token: address(alexia),
@@ -71,7 +71,8 @@ contract MarketPlaceTest is Helpers {
             privKeyA
         );
         uint256 lId = mPlace.createListing(listing);
-        switchSigner(publicAddress2);
+        switchSigner(publicAddress2);(publicAddress1, privateKey1) = mkaddr("publicAddress1");
+        (publicAddress2, privateKey2) = mkaddr("publicAddress2");
         uint256 publicAddress1BalanceBefore = publicAddress1.balance;
 
         mPlace.executeListing{value: listing.price}(lId);
@@ -86,10 +87,10 @@ contract MarketPlaceTest is Helpers {
         assertEq(ERC721(listing.token).ownerOf(listing.tokenId), publicAddress2);
         assertEq(publicAddress1BalanceAfter, publicAddress1BalanceBefore + listing.price);
     }
-import "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
+
     function testExecuteNonValidListing() public {
         switchSigner(publicAddress1);
-        vm.expectRevert("Not Owner");
+        vm.expectRevert("Not Valid Listing");
         mPlace.executeListing(1);
     }
 
@@ -113,7 +114,7 @@ import "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
         uint256 lId = mPlace.createListing(listing);
         mPlace.editListing(lId, 0.01 ether, false);
         switchSigner(publicAddress2);
-        vm.expectRevert("Not Owner");
+        vm.expectRevert("Not Active");
         mPlace.executeListing(lId);
     }
 
