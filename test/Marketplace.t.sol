@@ -24,8 +24,8 @@ contract MarketPlaceTest is Helpers {
         marketplace = new Marketplace();
         alexia = new Alexia();
 
-        (publicAddress1, privateKey1) = mkaddr("publicAddress1");
-        (publicAddress2, privateKey2) = mkaddr("publicAddress2");
+        (publicAddress1, privateKey1) = addresPair("publicAddress1");
+        (publicAddress2, privateKey2) = addresPair("publicAddress2");
 
         listing = Marketplace.Listing({
             token: address(alexia),
@@ -81,8 +81,8 @@ contract MarketPlaceTest is Helpers {
             privKeyA
         );
         uint256 lId = mPlace.createListing(listing);
-        switchSigner(publicAddress2);(publicAddress1, privateKey1) = mkaddr("publicAddress1");
-        (publicAddress2, privateKey2) = mkaddr("publicAddress2");
+        switchSigner(publicAddress2);(publicAddress1, privateKey1) = addresPair("publicAddress1");
+        (publicAddress2, privateKey2) = addresPair("publicAddress2");
         uint256 publicAddress1BalanceBefore = publicAddress1.balance;
 
         mPlace.executeListing{value: listing.price}(lId);

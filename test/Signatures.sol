@@ -6,7 +6,7 @@ import "../src/libraries/SignUtils.sol";
 
 abstract contract Helpers is Test {
     // uint256 user
-    function mkaddr(
+    function addresPair(
         string memory name
     ) public returns (address addr, uint256 privateKey) {
         privateKey = uint256(keccak256(abi.encodePacked(name)));
