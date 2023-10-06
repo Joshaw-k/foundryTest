@@ -27,6 +27,7 @@ contract Marketplace {
     Counters.Counter private listingIdCounter;
 
     address public admin;
+    
 
     constructor() {
         admin = msg.sender;
