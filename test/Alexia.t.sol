@@ -75,6 +75,24 @@ contract MarketPlaceTest is DiamondUtils, IDiamondCut,Helpers {
         assertEq(Alexia(address(diamond)).symbol(), "ALX");
     }
 
+    function testOwnerOf() public {
+        alexia.mint(publicAddress2, 2);
+        assertEq(alexia.ownerOf(2), publicAddress2);
+    }
+
+    function testBalanceOf() public {
+        alexia.mint(publicAddress1, 2);
+        assertEq(alexia.balanceOf(publicAddress1), 2);
+    }
+
+    function test_burn() public { 
+        alexia.mint(address(this), 3);
+        alexia._burn(3); 
+        assertEq(alexia.ownerOf(3), address(0)); 
+        assertEq(alexia.balanceOf(address(this)), 0);
+    }
+
+function test_approve() public { erc721._mint(address(this), 4); address spender = address(1); erc721.approve(spender, 4); assertEq(erc721.getApproved(4), spender); }
     function diamondCut(
         FacetCut[] calldata _diamondCut,
         address _init,
