@@ -10,6 +10,10 @@ contract Alexia is ERC721Facet {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         return ds.name;
     }
+    function symbol() public view virtual returns(string memory){
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        return ds.symbol;
+    }
     function tokenURI(
         uint256 id
     ) public view virtual override returns (string memory) {
