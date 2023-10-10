@@ -92,7 +92,12 @@ contract MarketPlaceTest is DiamondUtils, IDiamondCut,Helpers {
         assertEq(alexia.balanceOf(address(this)), 0);
     }
 
-function test_approve() public { erc721._mint(address(this), 4); address spender = address(1); erc721.approve(spender, 4); assertEq(erc721.getApproved(4), spender); }
+function test_approve() public { 
+    alexia._mint(address(this), 4); 
+    address spender = address(1); 
+    alexia.approve(spender, 4); 
+    assertEq(alexia.getApproved(4), spender); 
+}
     function diamondCut(
         FacetCut[] calldata _diamondCut,
         address _init,
