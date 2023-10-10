@@ -24,8 +24,6 @@ contract ERC721Facet {
                       ERC721 BALANCE/OWNER STORAGE
     //////////////////////////////////////////////////////////////*/
 
-    
-
     function ownerOf(uint256 id) public view virtual returns (address owner) {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         require((owner = ds._ownerOf[id]) != address(0), "NOT_MINTED");
@@ -133,17 +131,6 @@ contract ERC721Facet {
                 ERC721TokenReceiver.onERC721Received.selector,
             "UNSAFE_RECIPIENT"
         );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                              ERC165 LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function supportsInterface(bytes4 interfaceId) public view virtual returns (bool) {
-        return
-            interfaceId == 0x01ffc9a7 || // ERC165 Interface ID for ERC165
-            interfaceId == 0x80ac58cd || // ERC165 Interface ID for ERC721
-            interfaceId == 0x5b5e139f; // ERC165 Interface ID for ERC721Metadata
     }
 
     /*//////////////////////////////////////////////////////////////
