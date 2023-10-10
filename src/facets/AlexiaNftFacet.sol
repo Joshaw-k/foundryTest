@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "openzeppelin/token/ERC721/ERC721.sol";
+import {ERC721Facet} from "./ERC721Facet.sol";
 
-contract Alexia is ERC721("AlexiaNFT", "ALX") {
+contract Alexia is ERC721Facet {
     function tokenURI(
         uint256 id
     ) public view virtual override returns (string memory) {

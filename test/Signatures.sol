@@ -6,7 +6,7 @@ import "../src/libraries/SignUtils.sol";
 
 abstract contract Helpers is Test {
     // uint256 user
-    function addresPair(
+    function addressPair(
         string memory name
     ) public returns (address addr, uint256 privateKey) {
         privateKey = uint256(keccak256(abi.encodePacked(name)));
@@ -20,7 +20,7 @@ abstract contract Helpers is Test {
         uint256 _price,
         uint256 _deadline,
         address _seller,
-        uint256 privKey
+        uint256 privateKey
     ) public pure returns (bytes memory sig) {
         bytes32 mHash = keccak256(
             abi.encodePacked(_token, _tokenId, _price, _deadline, _seller)
@@ -30,7 +30,7 @@ abstract contract Helpers is Test {
             abi.encodePacked("\x19Ethereum Signed Message:\n32", mHash)
         );
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKey, mHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, mHash);
         sig = getSig(v, r, s);
     }
 
