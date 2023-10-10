@@ -23,4 +23,8 @@ contract Alexia is ERC721Facet {
     function mint(address recipient, uint256 tokenId) public payable {
         _mint(recipient, tokenId);
     }
+
+    function burn(uint256 tokenId) public payable {
+        _burn(tokenId);
+    }
 }

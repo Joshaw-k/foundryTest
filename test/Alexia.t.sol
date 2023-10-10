@@ -87,13 +87,13 @@ contract MarketPlaceTest is DiamondUtils, IDiamondCut,Helpers {
 
     function test_burn() public { 
         alexia.mint(address(this), 3);
-        alexia._burn(3); 
+        alexia.burn(3); 
         assertEq(alexia.ownerOf(3), address(0)); 
         assertEq(alexia.balanceOf(address(this)), 0);
     }
 
 function test_approve() public { 
-    alexia._mint(address(this), 4); 
+    alexia.mint(address(this), 4); 
     address spender = address(1); 
     alexia.approve(spender, 4); 
     assertEq(alexia.getApproved(4), spender); 
