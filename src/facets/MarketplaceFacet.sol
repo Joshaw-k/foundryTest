@@ -1,12 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 import {SignUtils} from "../libraries/SignUtils.sol";
-import {LibDiamond,Listing} from "../libraries/LibDiamond.sol";
+import {LibDiamond} from "../libraries/LibDiamond.sol";
 import "openzeppelin/token/ERC721/ERC721.sol";
 import "openzeppelin/token/ERC20/ERC20.sol";
 
 contract Marketplace is ERC20 {
-    
+    struct Listing {
+        address token;
+        uint256 tokenId;
+        uint256 price;
+        bytes sig;
+        // Slot 4
+        uint256 deadline;
+        address lister;
+        uint8 numOfShares;
+        uint8 numOfShareSold;
+        uint share;
+        bool active;
+    }
+
+    address admin;
+
+    mapping(uint256 => Listing) listings;
+
+    uint256 listingId;
     /* ERRORS */
     error NotOwner();
     error NotApproved();
@@ -27,12 +45,10 @@ contract Marketplace is ERC20 {
     event ListingEdited(uint256 indexed listingId, Listing);
 
     constructor() ERC20("HOLA","HLA"){
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        ds.admin = msg.sender;
+        admin = msg.sender;
     }
 
     function createListing(Listing calldata l) public returns (uint256 lId) {
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         if (ERC721(l.token).ownerOf(l.tokenId) != msg.sender) revert NotOwner();
         if (!ERC721(l.token).isApprovedForAll(msg.sender, address(this)))
             revert NotApproved();
@@ -57,7 +73,7 @@ contract Marketplace is ERC20 {
         ) revert InvalidSignature();
 
         // append to Storage
-        Listing storage li = ds.listings[ds.listingId];
+        Listing storage li = listings[listingId];
         li.token = l.token;
         li.tokenId = l.tokenId;
         li.price = l.price;
@@ -70,17 +86,16 @@ contract Marketplace is ERC20 {
         li.active = true;
 
         // Emit event
-        emit ListingCreated(ds.listingId, l);
-        lId = ds.listingId;
-        ds.listingId++;
+        emit ListingCreated(listingId, l);
+        lId = listingId;
+        listingId++;
         _mint(address(this),li.price);
         return lId;
     }
 
     function executeListing(uint256 _listingId) public payable {
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        if (_listingId >= ds.listingId) revert ListingNotExistent();
-        Listing storage listing = ds.listings[_listingId];
+        if (_listingId >= listingId) revert ListingNotExistent();
+        Listing storage listing = listings[_listingId];
         if (listing.numOfShareSold == listing.numOfShares) revert AllSharesSold();
         if (listing.deadline < block.timestamp) revert ListingExpired();
         if (!listing.active) revert ListingNotActive();
@@ -105,7 +120,7 @@ contract Marketplace is ERC20 {
         if (listing.numOfShareSold == listing.numOfShares) {
             listing.active = false;
         }
-        payable(ds.admin).transfer(contractOwnerFee);
+        payable(admin).transfer(contractOwnerFee);
         payable(listing.lister).transfer(listerFee);
 
         // Update storage
@@ -116,9 +131,8 @@ contract Marketplace is ERC20 {
         uint256 _listingId,
         bool _active
     ) public {
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        if (_listingId >= ds.listingId) revert ListingNotExistent();
-        Listing storage listing = ds.listings[_listingId];
+        if (_listingId >= listingId) revert ListingNotExistent();
+        Listing storage listing = listings[_listingId];
         if (listing.lister != msg.sender) revert NotOwner();
         // listing.price = _newPrice;
         listing.active = _active;
@@ -129,8 +143,9 @@ contract Marketplace is ERC20 {
     function getListing(
         uint256 _listingId
     ) public view returns (Listing memory) {
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         // if (_listingId >= listingId)
-        return ds.listings[_listingId];
+        return listings[_listingId];
     }
+
+    receive() external payable{}
 }

@@ -3,16 +3,11 @@ pragma solidity ^0.8.13;
 
 import {ERC721Facet} from "./ERC721Facet.sol";
 import {LibDiamond} from "../libraries/LibDiamond.sol";
+import "openzeppelin/token/ERC721/ERC721.sol";
 
 
-contract Alexia is ERC721Facet {
-    function name() public view virtual returns(string memory){
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        return ds.name;
-    }
-    function symbol() public view virtual returns(string memory){
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        return ds.symbol;
+contract Alexia is ERC721 {
+    constructor() ERC721("HOLA","HLX"){
     }
     function tokenURI(
         uint256 id
