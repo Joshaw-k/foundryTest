@@ -29,15 +29,15 @@ contract MarketPlaceTest is Helpers {
 
     function setUp() public {
      
-        // Deploying the marketplace contract and storing it's returning object
-        marketplace = new Marketplace();
-
-        // Deploying the Alexia NFT contract and storing it's returning object
-        alexia = new Alexia();
-
         //storing the key pairs from the addressPair function
         (publicAddress1, privateKey1) = addressPair("publicAddress1");
         (publicAddress2, privateKey2) = addressPair("publicAddress2");
+        // Deploying the marketplace contract and storing it's returning object
+        vm.startPrank(publicAddress2);
+        marketplace = new Marketplace();
+        vm.stopPrank();
+        // Deploying the Alexia NFT contract and storing it's returning object
+        alexia = new Alexia();
 
         //Default Listing object during setup
         listing = Marketplace.Listing({
@@ -166,5 +166,14 @@ contract MarketPlaceTest is Helpers {
         alexia.setApprovalForAll(address(marketplace), true);
         uint id = marketplace.createListing(listing);
         marketplace.executeListing{value:1 ether / 20}(id);
+    }
+
+    function testNoOfSharedSold() public {
+        switchSigner(publicAddress1);
+        alexia.setApprovalForAll(address(marketplace), true);
+        uint id = marketplace.createListing(listing);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        Marketplace.Listing memory executedlisting = marketplace.getListing(id);
+        assertEq(executedlisting.numOfShareSold, 1);
     }
 }
