@@ -3,8 +3,9 @@ pragma solidity ^0.8.13;
 import {SignUtils} from "../libraries/SignUtils.sol";
 import {LibDiamond,Listing} from "../libraries/LibDiamond.sol";
 import "openzeppelin/token/ERC721/ERC721.sol";
+import "openzeppelin/token/ERC20/ERC20.sol";
 
-contract Marketplace {
+contract Marketplace is ERC20 {
     
     /* ERRORS */
     error NotOwner();
@@ -17,6 +18,7 @@ contract Marketplace {
     error ListingNotActive();
     error PriceNotMet(int256 difference);
     error ListingExpired();
+    error AllSharesSold();
     error PriceMismatch(uint256 originalPrice);
 
     /* EVENTS */
@@ -24,7 +26,7 @@ contract Marketplace {
     event ListingExecuted(uint256 indexed listingId, Listing);
     event ListingEdited(uint256 indexed listingId, Listing);
 
-    constructor() {
+    constructor() ERC20("HOLA","HLA"){
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         ds.admin = msg.sender;
     }
@@ -62,12 +64,16 @@ contract Marketplace {
         li.sig = l.sig;
         li.deadline = l.deadline;
         li.lister = msg.sender;
+        li.numOfShares = l.numOfShares;
+        li.numOfShareSold = l.numOfShareSold;
+        li.share = l.share;
         li.active = true;
 
         // Emit event
         emit ListingCreated(ds.listingId, l);
         lId = ds.listingId;
         ds.listingId++;
+        _mint(address(this),li.price);
         return lId;
     }
 
@@ -75,24 +81,32 @@ contract Marketplace {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         if (_listingId >= ds.listingId) revert ListingNotExistent();
         Listing storage listing = ds.listings[_listingId];
+        if (listing.numOfShareSold == listing.numOfShares) revert AllSharesSold();
         if (listing.deadline < block.timestamp) revert ListingExpired();
         if (!listing.active) revert ListingNotActive();
-        if (listing.price < msg.value) revert PriceMismatch(listing.price);
-        if (listing.price != msg.value)
-            revert PriceNotMet(int256(listing.price) - int256(msg.value));
+        if (listing.share < msg.value) revert PriceMismatch(listing.share);
+        if (listing.share != msg.value)
+            revert PriceNotMet(int256(listing.share) - int256(msg.value));
+        _transfer(address(this), msg.sender, listing.share);
+        // // Update state
+        // listing.active = false;
 
-        // Update state
-        listing.active = false;
-
-        // transfer
-        ERC721(listing.token).transferFrom(
-            listing.lister,
-            msg.sender,
-            listing.tokenId
-        );
+        // // transfer
+        // ERC721(listing.token).transferFrom(
+        //     listing.lister,
+        //     msg.sender,
+        //     listing.tokenId
+        // );
 
         // transfer eth
-        payable(listing.lister).transfer(listing.price);
+        uint contractOwnerFee = listing.share * 1 / 1000;
+        uint listerFee = listing.share - contractOwnerFee;
+        listing.numOfShareSold++;
+        if (listing.numOfShareSold == listing.numOfShares) {
+            listing.active = false;
+        }
+        payable(ds.admin).transfer(contractOwnerFee);
+        payable(listing.lister).transfer(listerFee);
 
         // Update storage
         emit ListingExecuted(_listingId, listing);
@@ -100,14 +114,13 @@ contract Marketplace {
 
     function editListing(
         uint256 _listingId,
-        uint256 _newPrice,
         bool _active
     ) public {
         LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
         if (_listingId >= ds.listingId) revert ListingNotExistent();
         Listing storage listing = ds.listings[_listingId];
         if (listing.lister != msg.sender) revert NotOwner();
-        listing.price = _newPrice;
+        // listing.price = _newPrice;
         listing.active = _active;
         emit ListingEdited(_listingId, listing);
     }

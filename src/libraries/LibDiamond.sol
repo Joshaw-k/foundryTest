@@ -15,6 +15,9 @@ struct Listing {
         // Slot 4
         uint256 deadline;
         address lister;
+        uint8 numOfShares;
+        uint8 numOfShareSold;
+        uint share;
         bool active;
     }
 
