@@ -18,8 +18,10 @@ contract MarketPlaceTest is Helpers {
     //public and private address of the users
     address publicAddress1;
     address publicAddress2;
+    address publicAddress3;
     uint256 privateKey1;
     uint256 privateKey2;
+    uint256 privateKey3;
 
     //Our Listing template struct
     Marketplace.Listing listing;
@@ -32,6 +34,10 @@ contract MarketPlaceTest is Helpers {
         //storing the key pairs from the addressPair function
         (publicAddress1, privateKey1) = addressPair("publicAddress1");
         (publicAddress2, privateKey2) = addressPair("publicAddress2");
+        (publicAddress3, privateKey3) = addressPair("publicAddress3");
+        vm.deal(publicAddress1, 100 ether);
+        vm.deal(publicAddress2, 100 ether);
+        vm.deal(publicAddress3, 100 ether);
         // Deploying the marketplace contract and storing it's returning object
         vm.startPrank(publicAddress2);
         marketplace = new Marketplace();
@@ -175,5 +181,43 @@ contract MarketPlaceTest is Helpers {
         marketplace.executeListing{value:1 ether / 20}(id);
         Marketplace.Listing memory executedlisting = marketplace.getListing(id);
         assertEq(executedlisting.numOfShareSold, 1);
+    }
+
+    function testBalanceOf() public {
+        switchSigner(publicAddress1);
+        alexia.setApprovalForAll(address(marketplace), true);
+        uint id = marketplace.createListing(listing);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        assertEq(marketplace.balanceOf(publicAddress1), 1 ether / 20);
+    }
+
+    function testEverySharesSold() public {
+        vm.startPrank(publicAddress1);
+        alexia.setApprovalForAll(address(marketplace), true);
+        uint id = marketplace.createListing(listing);
+        vm.stopPrank();
+        vm.startPrank(publicAddress3);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        marketplace.executeListing{value:1 ether / 20}(id);
+        Marketplace.Listing memory executedlisting = marketplace.getListing(id);
+        assertEq(executedlisting.active, false);
     }
 }
